@@ -1,0 +1,634 @@
+﻿﻿
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Eurovision 2026 Jury System</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020205;
+            color: white;
+            -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .country-card {
+            transition: transform 0.4s cubic-bezier(0.2, 1, 0.3, 1), border-color 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            transform-origin: center center;
+        }
+
+            .country-card:hover {
+                transform: scale(1.02);
+                z-index: 20;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+                border-color: rgba(255, 255, 255, 0.25);
+            }
+
+        .country-bg-code {
+            transition: transform 0.5s cubic-bezier(0.2, 1, 0.3, 1), opacity 0.4s ease;
+            transform-origin: center center;
+            opacity: 0.07;
+            display: inline-block;
+            font-style: italic;
+            padding-right: 0.5rem;
+        }
+
+        .country-card:hover .country-bg-code {
+            transform: scale(1.15);
+            opacity: 0.12;
+        }
+
+        @keyframes countryFloat {
+            0% {
+                transform: translate(0, 0) rotate(-5deg);
+                opacity: 0;
+            }
+
+            10% {
+                opacity: 0.2;
+            }
+
+            90% {
+                opacity: 0.2;
+            }
+
+            100% {
+                transform: translate(150px, -150px) rotate(5deg);
+                opacity: 0;
+            }
+        }
+
+        @keyframes gradientTitle {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        @keyframes twinkle {
+            0%, 100% {
+                opacity: 0.3;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
+
+        .welcome-gradient-text {
+            background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1);
+            background-size: 300% auto;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: gradientTitle 8s linear infinite;
+            display: inline-block;
+            padding-right: 0.1em;
+        }
+
+        /* Адаптация заголовка специально для ПК */
+        @media (min-width: 640px) {
+            .welcome-gradient-text {
+                font-size: 2.25rem !important; /* Уменьшенный размер для ПК */
+                white-space: nowrap; /* Запрет переноса на новую строку */
+                letter-spacing: -0.05em;
+            }
+        }
+
+        .floating-country {
+            position: absolute;
+            white-space: nowrap;
+            font-weight: 900;
+            font-style: italic;
+            text-transform: uppercase;
+            pointer-events: none;
+            filter: blur(1px);
+            z-index: 0;
+            letter-spacing: -0.05em;
+            line-height: 1;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .glass-nav {
+            background: rgba(2, 2, 5, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .content-padding {
+            padding-bottom: 140px;
+        }
+
+        .score-bar-track {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 99px;
+            position: relative;
+            overflow: visible;
+        }
+
+        .score-bar-pill {
+            height: 100%;
+            border-radius: 99px;
+            position: relative;
+            transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .score-bar-glow {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translate(50%, -50%);
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            filter: blur(4px);
+        }
+
+        .sliding-tabs-container {
+            position: relative;
+            display: flex;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px;
+            border-radius: 1.25rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .active-tab-indicator {
+            position: absolute;
+            top: 4px;
+            bottom: 4px;
+            background: white;
+            border-radius: 1rem;
+            transition: all 0.4s cubic-bezier(0.2, 1, 0.3, 1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .tab-btn {
+            position: relative;
+            z-index: 10;
+            flex: 1;
+            padding: 10px 0;
+            text-align: center;
+            font-weight: 900;
+            font-size: 10px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        @media (max-width: 640px) {
+            .tab-btn {
+                font-size: 9px;
+                padding: 8px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const INITIAL_COUNTRIES = [
+            { id: 'geo', name: 'Грузия', en: 'Georgia', stage: 'Полуфинал 1', theme: 'from-red-600/40 to-white/20', accent: '#ef4444' },
+            { id: 'prt', name: 'Португалия', en: 'Portugal', stage: 'Полуфинал 1', theme: 'from-green-600/40 via-red-600/30 to-red-700/40', accent: '#22c55e' },
+            { id: 'hrv', name: 'Хорватия', en: 'Croatia', stage: 'Полуфинал 1', theme: 'from-red-600/40 via-white/10 to-blue-700/40', accent: '#3b82f6' },
+            { id: 'swe', name: 'Швеция', en: 'Sweden', stage: 'Полуфинал 1', theme: 'from-blue-600/40 to-yellow-500/40', accent: '#eab308' },
+            { id: 'fin', name: 'Финляндия', en: 'Finland', stage: 'Полуфинал 1', theme: 'from-white/30 to-blue-700/40', accent: '#3b82f6' },
+            { id: 'mda', name: 'Молдова', en: 'Moldova', stage: 'Полуфинал 1', theme: 'from-blue-700/40 via-yellow-500/30 to-red-600/40', accent: '#eab308' },
+            { id: 'grc', name: 'Греция', en: 'Greece', stage: 'Полуфинал 1', theme: 'from-blue-600/40 via-white/20 to-blue-600/40', accent: '#3b82f6' },
+            { id: 'mne', name: 'Черногория', en: 'Montenegro', stage: 'Полуфинал 1', theme: 'from-red-700/50 via-yellow-600/30 to-red-700/50', accent: '#dc2626' },
+            { id: 'est', name: 'Эстония', en: 'Estonia', stage: 'Полуфинал 1', theme: 'from-blue-500/40 via-black/40 to-white/20', accent: '#1e3a8a' },
+            { id: 'smr', name: 'Сан-Марино', en: 'San Marino', stage: 'Полуфинал 1', theme: 'from-sky-400/40 to-white/30', accent: '#38bdf8' },
+            { id: 'pol', name: 'Польша', en: 'Poland', stage: 'Полуфинал 1', theme: 'from-white/30 to-red-600/40', accent: '#ef4444' },
+            { id: 'bel', name: 'Бельгия', en: 'Belgium', stage: 'Полуфинал 1', theme: 'from-black/60 via-yellow-500/30 to-red-600/40', accent: '#fbbf24' },
+            { id: 'ltu', name: 'Литва', en: 'Lithuania', stage: 'Полуфинал 1', theme: 'from-yellow-500/40 via-green-600/30 to-red-600/40', accent: '#eab308' },
+            { id: 'srb', name: 'Сербия', en: 'Serbia', stage: 'Полуфинал 1', theme: 'from-red-600/40 via-blue-700/30 to-white/20', accent: '#991b1b' },
+            { id: 'isr', name: 'Израиль', en: 'Israel', stage: 'Полуфинал 1', theme: 'from-blue-600/40 via-white/30 to-blue-600/40', accent: '#2563eb' },
+            { id: 'arm', name: 'Армения', en: 'Armenia', stage: 'Полуфинал 2', theme: 'from-red-600/40 via-blue-600/30 to-orange-500/40', accent: '#ef4444' },
+            { id: 'rou', name: 'Румыния', en: 'Romania', stage: 'Полуфинал 2', theme: 'from-blue-700/40 via-yellow-500/30 to-red-600/40', accent: '#eab308' },
+            { id: 'che', name: 'Швейцария', en: 'Switzerland', stage: 'Полуфинал 2', theme: 'from-red-600/50 to-white/20', accent: '#ef4444' },
+            { id: 'aze', name: 'Азербайджан', en: 'Azerbaijan', stage: 'Полуфинал 2', theme: 'from-sky-500/40 via-red-500/30 to-green-500/40', accent: '#10b981' },
+            { id: 'lux', name: 'Люксембург', en: 'Luxembourg', stage: 'Полуфинал 2', theme: 'from-red-500/40 via-white/20 to-sky-400/40', accent: '#60a5fa' },
+            { id: 'bgr', name: 'Болгария', en: 'Bulgaria', stage: 'Полуфинал 2', theme: 'from-white/30 via-green-600/30 to-red-600/40', accent: '#15803d' },
+            { id: 'cze', name: 'Чехия', en: 'Czechia', stage: 'Полуфинал 2', theme: 'from-white/20 via-red-600/30 to-blue-800/40', accent: '#1e40af' },
+            { id: 'alb', name: 'Албания', en: 'Albania', stage: 'Полуфинал 2', theme: 'from-red-700/60 to-black/60', accent: '#991b1b' },
+            { id: 'dnk', name: 'Дания', en: 'Denmark', stage: 'Полуфинал 2', theme: 'from-red-600/50 to-white/30', accent: '#f87171' },
+            { id: 'cyp', name: 'Кипр', en: 'Cyprus', stage: 'Полуфинал 2', theme: 'from-white/40 via-orange-400/30 to-green-600/20', accent: '#38bdf8' },
+            { id: 'nor', name: 'Норвегия', en: 'Norway', stage: 'Полуфинал 2', theme: 'from-red-600/40 via-blue-800/40 to-red-600/40', accent: '#ef4444' },
+            { id: 'mlt', name: 'Мальта', en: 'Malta', stage: 'Полуфинал 2', theme: 'from-white/30 via-red-600/40 to-red-700/40', accent: '#dc2626' },
+            { id: 'aus', name: 'Австралия', en: 'Australia', stage: 'Полуфинал 2', theme: 'from-blue-900/40 via-white/20 to-red-600/40', accent: '#1e3a8a' },
+            { id: 'ukr', name: 'Украина', en: 'Ukraine', stage: 'Полуфинал 2', theme: 'from-blue-500/50 to-yellow-400/50', accent: '#eab308' },
+            { id: 'lva', name: 'Латвия', en: 'Latvia', stage: 'Полуфинал 2', theme: 'from-red-800/50 via-white/20 to-red-800/50', accent: '#7f1d1d' },
+            { id: 'aut', name: 'Австрия', en: 'Austria', stage: 'Финал', theme: 'from-red-600/40 via-white/30 to-red-600/40', accent: '#ef4444' },
+            { id: 'fra', name: 'Франция', en: 'France', stage: 'Финал', theme: 'from-blue-700/40 via-white/20 to-red-700/40', accent: '#2563eb' },
+            { id: 'deu', name: 'Германия', en: 'Germany', stage: 'Финал', theme: 'from-black/70 via-red-600/40 to-yellow-500/40', accent: '#ef4444' },
+            { id: 'ita', name: 'Италия', en: 'Italy', stage: 'Финал', theme: 'from-green-600/40 via-white/20 to-red-600/40', accent: '#10b981' },
+            { id: 'gbr', name: 'Великобритания', en: 'United Kingdom', stage: 'Финал', theme: 'from-blue-800/40 via-white/20 to-red-700/40', accent: '#3b82f6' }
+        ];
+
+        const STAGES = ['Полуфинал 1', 'Полуфинал 2', 'Финал'];
+        const SCORE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12];
+
+        function StarField() {
+            const stars = useMemo(() => Array.from({ length: 80 }).map((_, i) => ({
+                id: i, left: Math.random() * 100, top: Math.random() * 100,
+                size: Math.random() * 2 + 1, delay: Math.random() * 5, duration: 3 + Math.random() * 4
+            })), []);
+            return (
+                <div className="fixed inset-0 pointer-events-none z-0">
+                    {stars.map(s => <div key={s.id} className="star" style={{ left: `${s.left}%`, top: `${s.top}%`, width: `${s.size}px`, height: `${s.size}px`, opacity: 0.5, animation: `twinkle ${s.duration}s infinite ease-in-out`, animationDelay: `${s.delay}s` }} />)}
+                </div>
+            );
+        }
+
+        function FloatingBackground() {
+            const elements = useMemo(() => Array.from({ length: 15 }).map((_, i) => {
+                const country = INITIAL_COUNTRIES[Math.floor(Math.random() * INITIAL_COUNTRIES.length)];
+                return { id: i, name: country.en, accent: country.accent, left: Math.random() * 90, top: Math.random() * 90, delay: Math.random() * 20, duration: 15 + Math.random() * 20, size: 18 + Math.random() * 32 };
+            }), []);
+            return (
+                <div className="absolute inset-0 overflow-hidden opacity-40">
+                    {elements.map(e => (
+                        <div key={e.id} className="floating-country" style={{ left: `${e.left}%`, top: `${e.top}%`, fontSize: `${e.size}px`, color: e.accent, textShadow: `0 0 15px ${e.accent}33`, animation: `countryFloat ${e.duration}s infinite linear`, animationDelay: `-${e.delay}s` }}>
+                            {e.name}
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        function SlidingTabs({ options, activeValue, onChange }) {
+            const activeIndex = options.indexOf(activeValue);
+            return (
+                <div className="sliding-tabs-container mb-8">
+                    <div className="active-tab-indicator" style={{ left: `${(activeIndex * (100 / options.length)) + 0.2}%`, width: `${(100 / options.length) - 0.4}%` }} />
+                    {options.map((opt) => (
+                        <div key={opt} className={`tab-btn ${activeValue === opt ? 'text-black' : 'text-gray-500'}`} onClick={() => onChange(opt)}>{opt}</div>
+                    ))}
+                </div>
+            );
+        }
+
+        function App() {
+            const [user, setUser] = useState(() => {
+                const saved = localStorage.getItem('ev26_user_session');
+                return saved ? JSON.parse(saved) : null;
+            });
+            const [userNameInput, setUserNameInput] = useState('');
+            const [existingUsersWithSameName, setExistingUsersWithSameName] = useState([]);
+            const [showAccountPicker, setShowAccountPicker] = useState(false);
+            const [currentStage, setCurrentStage] = useState('Полуфинал 1');
+            const [leaderboardStage, setLeaderboardStage] = useState('Финал');
+            const [votes, setVotes] = useState({});
+            const [view, setView] = useState('voting');
+            const [countries, setCountries] = useState(() => {
+                const saved = localStorage.getItem('ev26_countries');
+                return saved ? JSON.parse(saved) : INITIAL_COUNTRIES;
+            });
+
+            const isAdmin = user?.name?.toLowerCase() === 'евгений';
+
+            useEffect(() => {
+                if (user) {
+                    const savedVotes = localStorage.getItem(`ev26_votes_${user.id}`);
+                    if (savedVotes) setVotes(JSON.parse(savedVotes));
+                    const allUsers = JSON.parse(localStorage.getItem('ev26_all_users_v2') || '[]');
+                    if (!allUsers.find(u => u.id === user.id)) {
+                        allUsers.push(user);
+                        localStorage.setItem('ev26_all_users_v2', JSON.stringify(allUsers));
+                    }
+                }
+            }, [user]);
+
+            useEffect(() => {
+                if (user) localStorage.setItem(`ev26_votes_${user.id}`, JSON.stringify(votes));
+            }, [votes, user]);
+
+            useEffect(() => {
+                localStorage.setItem('ev26_countries', JSON.stringify(countries));
+            }, [countries]);
+
+            const handleLoginAttempt = (e) => {
+                e.preventDefault();
+                const name = userNameInput.trim();
+                if (!name) return;
+                const allUsers = JSON.parse(localStorage.getItem('ev26_all_users_v2') || '[]');
+                const matched = allUsers.filter(u => u.name.toLowerCase() === name.toLowerCase());
+                if (matched.length > 0) {
+                    setExistingUsersWithSameName(matched);
+                    setShowAccountPicker(true);
+                } else {
+                    createNewAccount(name);
+                }
+            };
+
+            const createNewAccount = (name) => {
+                const newUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+                const newUser = { id: newUserId, name: name };
+                performLogin(newUser);
+            };
+
+            const performLogin = (userData) => {
+                setUser(userData);
+                localStorage.setItem('ev26_user_session', JSON.stringify(userData));
+                setShowAccountPicker(false);
+                setUserNameInput('');
+            };
+
+            const logout = () => {
+                setUser(null);
+                localStorage.removeItem('ev26_user_session');
+                setVotes({});
+            };
+
+            const castVote = (countryId, score, stage) => {
+                const newVotes = { ...votes };
+                const voteKey = `${countryId}_${stage}`;
+                if (score === 12) {
+                    const existing12Key = Object.entries(newVotes).find(([key, s]) => {
+                        const [cid, stg] = key.split('_');
+                        return stg === stage && s === 12 && key !== voteKey;
+                    });
+                    if (existing12Key) delete newVotes[existing12Key[0]];
+                }
+                newVotes[voteKey] === score ? delete newVotes[voteKey] : newVotes[voteKey] = score;
+                setVotes(newVotes);
+            };
+
+            const promoteToFinal = (country) => {
+                if (!countries.some(c => c.id === country.id && c.stage === 'Финал')) {
+                    setCountries(prev => [...prev, { ...country, stage: 'Финал' }]);
+                }
+            };
+
+            const protocolData = useMemo(() => {
+                const allUsers = JSON.parse(localStorage.getItem('ev26_all_users_v2') || '[]');
+                return allUsers.map(u => ({
+                    ...u,
+                    votes: JSON.parse(localStorage.getItem(`ev26_votes_${u.id}`) || '{}')
+                }));
+            }, [view, votes]);
+
+            const getLeaderboardData = (stageName) => {
+                const scores = {};
+                protocolData.forEach(p => {
+                    Object.entries(p.votes).forEach(([voteKey, val]) => {
+                        const [cid, stg] = voteKey.split('_');
+                        if (stg === stageName) scores[cid] = (scores[cid] || 0) + val;
+                    });
+                });
+                return countries
+                    .filter(c => c.stage === stageName)
+                    .map(c => ({ ...c, total: scores[c.id] || 0 }))
+                    .sort((a, b) => b.total - a.total);
+            };
+
+            if (!user) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-6 relative bg-[#020205]">
+                        <StarField />
+                        <FloatingBackground />
+                        <div className="w-full max-w-sm bg-[#0a0a15]/80 backdrop-blur-xl border border-white/10 p-8 rounded-[3rem] shadow-[0_0_50px_rgba(79,70,229,0.15)] text-center relative z-10 animate-in">
+                            <div className="mb-10 px-2">
+                                <h1 className="text-4xl sm:text-5xl font-black uppercase italic welcome-gradient-text leading-tight tracking-tighter">
+                                    Eurovision’26
+                                </h1>
+                            </div>
+                            {!showAccountPicker ? (
+                                <form onSubmit={handleLoginAttempt} className="space-y-4">
+                                    <div className="relative group">
+                                        <input className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none text-center font-bold text-white text-lg placeholder:text-gray-700 focus:border-indigo-500/50 focus:bg-white/[0.08] transition-all" placeholder="ВАШЕ ИМЯ" value={userNameInput} onChange={e => setUserNameInput(e.target.value)} />
+                                    </div>
+                                    <button className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 active:scale-[0.98] transition-all uppercase tracking-widest text-sm">ВОЙТИ ❯</button>
+                                </form>
+                            ) : (
+                                <div className="space-y-5 animate-in">
+                                    <p className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">Аккаунты с этим именем:</p>
+                                    <div className="space-y-3">
+                                        {existingUsersWithSameName.map(acc => (
+                                            <button key={acc.id} onClick={() => performLogin(acc)} className="w-full bg-white/5 hover:bg-white/10 border border-white/10 p-4 rounded-2xl flex items-center justify-between group transition-all">
+                                                <div className="text-left">
+                                                    <div className="text-white font-black uppercase text-xs pr-2">{acc.name} </div>
+                                                    <div className="text-[8px] text-gray-500 font-bold tracking-tighter uppercase">ID: {acc.id.split('_').pop()}</div>
+                                                </div>
+                                                <div className="text-indigo-400 group-hover:translate-x-1 transition-transform">❯</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="pt-4 border-t border-white/5">
+                                        <button onClick={() => createNewAccount(userNameInput)} className="text-indigo-400 font-black uppercase text-[9px] tracking-widest hover:text-indigo-300 transition-colors">Создать новый профиль</button>
+                                    </div>
+                                    <button onClick={() => setShowAccountPicker(false)} className="block w-full text-gray-600 font-bold text-[9px] uppercase mt-2">Назад</button>
+                                </div>
+                            )}
+                            <p className="mt-8 text-[9px] uppercase tracking-[0.2em] text-gray-600 font-bold">Official Jury System</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            const views = ['voting', 'protocol', 'leaderboard'];
+            const viewLabels = ['ГОЛОС', 'ПРОТОКОЛ', 'ТОП'];
+
+            return (
+                <div className="min-h-screen bg-[#020205]">
+                    <StarField />
+                    <nav className="fixed top-0 w-full z-50 glass-nav border-b border-white/5 px-4 md:px-8 py-3 md:py-4">
+                        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 md:grid md:grid-cols-3">
+                            <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
+                                <span className="font-black text-lg md:text-xl tracking-tighter text-white italic">EV'26 </span>
+                                <div className="h-4 w-px bg-white/10 hidden md:block"></div>
+                                <div className="hidden md:flex flex-col min-w-0">
+                                    <span className="text-[9px] font-black text-indigo-400 uppercase leading-none mb-1">Жюри</span>
+                                    <span className="text-xs font-bold text-white/60 leading-none truncate uppercase italic pr-2" title={user.name}>{user.name} </span>
+                                </div>
+                            </div>
+                            <div className="flex-grow md:flex-grow-0 flex justify-center">
+                                <div className="sliding-tabs-container w-full max-w-[280px] md:w-80">
+                                    <div className="active-tab-indicator" style={{ left: `${(views.indexOf(view) * 33.33) + 0.2}%`, width: '32.93%' }} />
+                                    {views.map((v, i) => (
+                                        <div key={v} onClick={() => setView(v)} className={`tab-btn ${view === v ? 'text-black' : 'text-gray-500'}`}>{viewLabels[i]}</div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="flex justify-end flex-shrink-0">
+                                <button onClick={logout} className="p-2 text-white/20 hover:text-red-400 transition-colors">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <main className="relative z-10 pt-24 md:pt-28 px-4 md:px-8 max-w-7xl mx-auto content-padding">
+                        {view === 'voting' && (
+                            <div className="animate-in">
+                                <div className="max-w-lg mx-auto">
+                                    <SlidingTabs options={STAGES} activeValue={currentStage} onChange={setCurrentStage} />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    {countries.filter(c => c.stage === currentStage).map((country, idx) => {
+                                        const voteKey = `${country.id}_${currentStage}`;
+                                        const currentScore = votes[voteKey];
+                                        return (
+                                            <div key={`${country.id}_${idx}`} className={`country-card relative overflow-hidden bg-gradient-to-br ${country.theme} border border-white/5 rounded-[2.5rem] p-8 backdrop-blur-md shadow-inner`}>
+                                                <div className="absolute top-4 right-8 pointer-events-none">
+                                                    <span className="country-bg-code text-white font-black text-7xl uppercase">
+                                                        {country.id}
+                                                    </span>
+                                                </div>
+                                                <div className="relative z-10">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div className="flex items-center gap-2 text-white/60">
+                                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: country.accent, boxShadow: `0 0 10px ${country.accent}` }}></div>
+                                                            <span className="text-[10px] font-black uppercase tracking-widest">{country.stage} </span>
+                                                        </div>
+                                                    </div>
+                                                    <h3 className="text-3xl font-black text-white mb-6 flex items-center gap-3 drop-shadow-lg italic">
+                                                        {country.name}
+                                                        {currentScore === 12 && <span className="text-yellow-400 text-2xl animate-pulse">★</span>}
+                                                    </h3>
+                                                    <div className="flex flex-col gap-4">
+                                                        <div className="grid grid-cols-5 gap-2.5">
+                                                            {SCORE_OPTIONS.map(score => (
+                                                                <button key={score} onClick={() => castVote(country.id, score, currentStage)} className={`py-3.5 rounded-xl font-black text-xs border transition-all ${currentScore === score ? 'bg-white text-black border-white shadow-xl scale-105' : score === 12 ? 'bg-yellow-400/20 text-yellow-400 border-yellow-400/40 active:bg-yellow-400 active:text-black' : 'bg-black/40 border-white/10 active:bg-indigo-500/20 backdrop-blur-md'}`}>{score}</button>
+                                                            ))}
+                                                        </div>
+                                                        {isAdmin && currentStage !== 'Финал' && (
+                                                            <button onClick={() => promoteToFinal(country)} className="w-full bg-blue-500/30 hover:bg-blue-500/50 text-[10px] font-black py-2.5 rounded-xl text-blue-200 transition-colors border border-blue-500/40 uppercase tracking-widest">Финал+</button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                        {view === 'protocol' && (
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 animate-in">
+                                {protocolData.map((p, idx) => (
+                                    <JuryProtocolCard key={p.id} jury={p} countries={countries} />
+                                ))}
+                            </div>
+                        )}
+                        {view === 'leaderboard' && (
+                            <div className="max-w-4xl mx-auto animate-in">
+                                <div className="max-w-lg mx-auto">
+                                    <SlidingTabs options={STAGES} activeValue={leaderboardStage} onChange={setLeaderboardStage} />
+                                </div>
+                                <div key={leaderboardStage} className="space-y-4 animate-in">
+                                    {getLeaderboardData(leaderboardStage).map((c, i) => (
+                                        <div key={c.id} className="flex items-center gap-6 bg-[#0a0a15]/60 backdrop-blur-md p-6 rounded-[2.5rem] border border-white/5 transition-all">
+                                            <span className="w-8 text-2xl font-black text-white/5 italic">#{i+1} </span>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <span className="font-black text-xl text-white block leading-none italic">{c.name} </span>
+                                                    <span className="font-black text-2xl text-indigo-500">{c.total} <span className="text-[10px] text-gray-700 uppercase">pts</span></span>
+                                                </div>
+                                                <div className="score-bar-track">
+                                                    <div className={`score-bar-pill`} style={{ width: `${Math.max(2, (c.total / (Math.max(1, protocolData.length) * 12)) * 100)}%`, backgroundColor: c.accent }}>
+                                                        <div className="score-bar-glow" style={{ backgroundColor: c.accent }}></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        function JuryProtocolCard({ jury, countries }) {
+            const [filter, setFilter] = useState('Финал');
+            const filteredVotes = Object.entries(jury.votes).filter(([voteKey]) => voteKey.endsWith(`_${filter}`));
+            const activeIndex = STAGES.indexOf(filter);
+            return (
+                <div className="bg-[#0a0a15]/60 backdrop-blur-md border border-white/5 rounded-[3rem] p-8 md:p-10 shadow-2xl">
+                    <div className="flex flex-col gap-8 mb-10">
+                        <div className="flex items-center gap-5">
+                            <div className="w-14 h-14 bg-gradient-to-br from-indigo-500/20 to-purple-600/20 rounded-2xl flex items-center justify-center text-indigo-400 border border-white/5 text-2xl font-black uppercase">{jury.name[0].toUpperCase()}</div>
+                            <div>
+                                <p className="text-xl font-black text-white leading-none italic uppercase tracking-tighter pr-2">{jury.name} </p>
+                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mt-2">ID: {jury.id.split('_').pop()}</p>
+                            </div>
+                        </div>
+                        <div className="sliding-tabs-container w-full">
+                            <div className="active-tab-indicator" style={{ left: `${(activeIndex * 33.33) + 0.2}%`, width: '32.93%' }} />
+                            {STAGES.map(s => <div key={s} onClick={() => setFilter(s)} className={`tab-btn ${filter === s ? 'text-black' : 'text-gray-500'}`}>{s === 'Полуфинал 1' ? 'ПФ 1' : s === 'Полуфинал 2' ? 'ПФ 2' : 'Финал'}</div>)}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {filteredVotes.length > 0 ? filteredVotes.sort((a,b) => b[1] - a[1]).map(([voteKey, score]) => {
+                            const [cid] = voteKey.split('_');
+                            return (
+                                <div key={voteKey} className="flex justify-between items-center bg-white/[0.03] p-4 rounded-2xl border border-white/5">
+                                    <span className="font-bold text-sm text-gray-300 italic">{countries.find(x => x.id === cid)?.name} </span>
+                                    <span className={`font-black text-sm px-3 py-1 rounded-lg ${score === 12 ? 'bg-yellow-500/20 text-yellow-500' : 'bg-indigo-500/10 text-indigo-400'}`}>{score}</span>
+                                </div>
+                            );
+                        }) : <p className="col-span-full text-center py-10 bg-white/5 rounded-2xl text-gray-700 italic text-xs uppercase tracking-widest">Нет оценок</p>}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
