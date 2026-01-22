@@ -1,4 +1,3 @@
-﻿﻿
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -233,11 +232,32 @@
             }
         }
     </style>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
+
+        // --- FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBA8UAua74i4Oru72jMEoV8u50hrAbVD8g",
+            authDomain: "ev-26-17026.firebaseapp.com",
+            databaseURL: "https://ev-26-17026-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "ev-26-17026",
+            storageBucket: "ev-26-17026.appspot.com",
+            messagingSenderId: "128745556660",
+            appId: "1:128745556660:web:c674978c9a8dde2a0da5e1",
+            measurementId: "G-R8WWFF98XE"
+        };
+
+        // Initialize Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
         const { useState, useEffect, useMemo } = React;
 
         const INITIAL_COUNTRIES = [
@@ -322,49 +342,84 @@
         }
 
         function App() {
+            // Local State for Session
             const [user, setUser] = useState(() => {
                 const saved = localStorage.getItem('ev26_user_session');
                 return saved ? JSON.parse(saved) : null;
             });
+            const [view, setView] = useState('voting');
+            const [currentStage, setCurrentStage] = useState('Полуфинал 1');
+            const [leaderboardStage, setLeaderboardStage] = useState('Финал');
             const [userNameInput, setUserNameInput] = useState('');
             const [existingUsersWithSameName, setExistingUsersWithSameName] = useState([]);
             const [showAccountPicker, setShowAccountPicker] = useState(false);
-            const [currentStage, setCurrentStage] = useState('Полуфинал 1');
-            const [leaderboardStage, setLeaderboardStage] = useState('Финал');
-            const [votes, setVotes] = useState({});
-            const [view, setView] = useState('voting');
-            const [countries, setCountries] = useState(() => {
-                const saved = localStorage.getItem('ev26_countries');
-                return saved ? JSON.parse(saved) : INITIAL_COUNTRIES;
-            });
+
+            // Firebase Synced State
+            const [allUsers, setAllUsers] = useState([]); // List of all users from FB
+            const [allVotes, setAllVotes] = useState({}); // { userId: { voteKey: score } }
+            const [countries, setCountries] = useState([]); // Sync countries status
 
             const isAdmin = user?.name?.toLowerCase() === 'евгений';
 
+            // 1. Initial Data & Listeners
             useEffect(() => {
-                if (user) {
-                    const savedVotes = localStorage.getItem(`ev26_votes_${user.id}`);
-                    if (savedVotes) setVotes(JSON.parse(savedVotes));
-                    const allUsers = JSON.parse(localStorage.getItem('ev26_all_users_v2') || '[]');
-                    if (!allUsers.find(u => u.id === user.id)) {
-                        allUsers.push(user);
-                        localStorage.setItem('ev26_all_users_v2', JSON.stringify(allUsers));
+                // Listen to Users
+                const usersRef = db.ref('users');
+                usersRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        setAllUsers(Object.values(data));
+                    } else {
+                        setAllUsers([]);
                     }
-                }
-            }, [user]);
+                });
 
-            useEffect(() => {
-                if (user) localStorage.setItem(`ev26_votes_${user.id}`, JSON.stringify(votes));
-            }, [votes, user]);
+                // Listen to Countries (and Seed if empty)
+                const countriesRef = db.ref('countries');
+                countriesRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        setCountries(data);
+                    } else {
+                        // Seed initial data if DB is empty
+                        countriesRef.set(INITIAL_COUNTRIES);
+                        setCountries(INITIAL_COUNTRIES);
+                    }
+                });
 
-            useEffect(() => {
-                localStorage.setItem('ev26_countries', JSON.stringify(countries));
-            }, [countries]);
+                // Listen to ALL Votes (Crucial for Protocol & Leaderboard)
+                const votesRef = db.ref('votes');
+                votesRef.on('value', (snapshot) => {
+                    const data = snapshot.val() || {};
+                    setAllVotes(data);
+                });
+
+                return () => {
+                    usersRef.off();
+                    countriesRef.off();
+                    votesRef.off();
+                };
+            }, []);
+
+            // 2. Persist Login
+            const performLogin = (userData) => {
+                setUser(userData);
+                localStorage.setItem('ev26_user_session', JSON.stringify(userData));
+                setShowAccountPicker(false);
+                setUserNameInput('');
+            };
+
+            const logout = () => {
+                setUser(null);
+                localStorage.removeItem('ev26_user_session');
+            };
 
             const handleLoginAttempt = (e) => {
                 e.preventDefault();
                 const name = userNameInput.trim();
                 if (!name) return;
-                const allUsers = JSON.parse(localStorage.getItem('ev26_all_users_v2') || '[]');
+
+                // Check against Firebase users
                 const matched = allUsers.filter(u => u.name.toLowerCase() === name.toLowerCase());
                 if (matched.length > 0) {
                     setExistingUsersWithSameName(matched);
@@ -377,49 +432,59 @@
             const createNewAccount = (name) => {
                 const newUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
                 const newUser = { id: newUserId, name: name };
-                performLogin(newUser);
+
+                // Save to Firebase
+                db.ref(`users/${newUserId}`).set(newUser).then(() => {
+                    performLogin(newUser);
+                });
             };
 
-            const performLogin = (userData) => {
-                setUser(userData);
-                localStorage.setItem('ev26_user_session', JSON.stringify(userData));
-                setShowAccountPicker(false);
-                setUserNameInput('');
-            };
-
-            const logout = () => {
-                setUser(null);
-                localStorage.removeItem('ev26_user_session');
-                setVotes({});
-            };
-
+            // 3. Actions (Writes to Firebase)
             const castVote = (countryId, score, stage) => {
-                const newVotes = { ...votes };
+                if (!user) return;
+
+                // Get current user's votes from state or empty object
+                const currentVotes = { ...(allVotes[user.id] || {}) };
                 const voteKey = `${countryId}_${stage}`;
+
+                // Logic: One '12' per stage
                 if (score === 12) {
-                    const existing12Key = Object.entries(newVotes).find(([key, s]) => {
+                    const existing12Key = Object.entries(currentVotes).find(([key, s]) => {
                         const [cid, stg] = key.split('_');
                         return stg === stage && s === 12 && key !== voteKey;
                     });
-                    if (existing12Key) delete newVotes[existing12Key[0]];
+                    if (existing12Key) delete currentVotes[existing12Key[0]];
                 }
-                newVotes[voteKey] === score ? delete newVotes[voteKey] : newVotes[voteKey] = score;
-                setVotes(newVotes);
+
+                // Toggle logic
+                if (currentVotes[voteKey] === score) {
+                    delete currentVotes[voteKey];
+                } else {
+                    currentVotes[voteKey] = score;
+                }
+
+                // Write update to Firebase
+                db.ref(`votes/${user.id}`).set(currentVotes);
             };
 
             const promoteToFinal = (country) => {
-                if (!countries.some(c => c.id === country.id && c.stage === 'Финал')) {
-                    setCountries(prev => [...prev, { ...country, stage: 'Финал' }]);
+                // Update specific country in Firebase
+                const updatedCountries = countries.map(c =>
+                    c.id === country.id ? { ...c, stage: 'Финал' } : c
+                );
+
+                if (!countries.find(c => c.id === country.id && c.stage === 'Финал')) {
+                    db.ref('countries').set(updatedCountries);
                 }
             };
 
+            // 4. Derived Data for UI
             const protocolData = useMemo(() => {
-                const allUsers = JSON.parse(localStorage.getItem('ev26_all_users_v2') || '[]');
                 return allUsers.map(u => ({
                     ...u,
-                    votes: JSON.parse(localStorage.getItem(`ev26_votes_${u.id}`) || '{}')
+                    votes: allVotes[u.id] || {}
                 }));
-            }, [view, votes]);
+            }, [allUsers, allVotes]);
 
             const getLeaderboardData = (stageName) => {
                 const scores = {};
@@ -429,11 +494,15 @@
                         if (stg === stageName) scores[cid] = (scores[cid] || 0) + val;
                     });
                 });
+
                 return countries
                     .filter(c => c.stage === stageName)
                     .map(c => ({ ...c, total: scores[c.id] || 0 }))
                     .sort((a, b) => b.total - a.total);
             };
+
+            // Current User's votes for Voting View
+            const myVotes = user && allVotes[user.id] ? allVotes[user.id] : {};
 
             if (!user) {
                 return (
@@ -520,7 +589,7 @@
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                     {countries.filter(c => c.stage === currentStage).map((country, idx) => {
                                         const voteKey = `${country.id}_${currentStage}`;
-                                        const currentScore = votes[voteKey];
+                                        const currentScore = myVotes[voteKey];
                                         return (
                                             <div key={`${country.id}_${idx}`} className={`country-card relative overflow-hidden bg-gradient-to-br ${country.theme} border border-white/5 rounded-[2.5rem] p-8 backdrop-blur-md shadow-inner`}>
                                                 <div className="absolute top-4 right-8 pointer-events-none">
