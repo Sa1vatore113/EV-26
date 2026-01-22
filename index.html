@@ -363,35 +363,26 @@
 
             // 1. Initial Data & Listeners
             useEffect(() => {
-                // Listen to Users
                 const usersRef = db.ref('users');
                 usersRef.on('value', (snapshot) => {
                     const data = snapshot.val();
-                    if (data) {
-                        setAllUsers(Object.values(data));
-                    } else {
-                        setAllUsers([]);
-                    }
+                    setAllUsers(data ? Object.values(data) : []);
                 });
 
-                // Listen to Countries (and Seed if empty)
                 const countriesRef = db.ref('countries');
                 countriesRef.on('value', (snapshot) => {
                     const data = snapshot.val();
                     if (data) {
                         setCountries(data);
                     } else {
-                        // Seed initial data if DB is empty
                         countriesRef.set(INITIAL_COUNTRIES);
                         setCountries(INITIAL_COUNTRIES);
                     }
                 });
 
-                // Listen to ALL Votes (Crucial for Protocol & Leaderboard)
                 const votesRef = db.ref('votes');
                 votesRef.on('value', (snapshot) => {
-                    const data = snapshot.val() || {};
-                    setAllVotes(data);
+                    setAllVotes(snapshot.val() || {});
                 });
 
                 return () => {
@@ -400,6 +391,16 @@
                     votesRef.off();
                 };
             }, []);
+
+            // FIX: Ensure Admin/User exists in DB on load
+            useEffect(() => {
+                if (user) {
+                    db.ref(`users/${user.id}`).update({
+                        id: user.id,
+                        name: user.name
+                    });
+                }
+            }, [user]);
 
             // 2. Persist Login
             const performLogin = (userData) => {
@@ -419,7 +420,6 @@
                 const name = userNameInput.trim();
                 if (!name) return;
 
-                // Check against Firebase users
                 const matched = allUsers.filter(u => u.name.toLowerCase() === name.toLowerCase());
                 if (matched.length > 0) {
                     setExistingUsersWithSameName(matched);
@@ -433,7 +433,6 @@
                 const newUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
                 const newUser = { id: newUserId, name: name };
 
-                // Save to Firebase
                 db.ref(`users/${newUserId}`).set(newUser).then(() => {
                     performLogin(newUser);
                 });
@@ -443,11 +442,9 @@
             const castVote = (countryId, score, stage) => {
                 if (!user) return;
 
-                // Get current user's votes from state or empty object
                 const currentVotes = { ...(allVotes[user.id] || {}) };
                 const voteKey = `${countryId}_${stage}`;
 
-                // Logic: One '12' per stage
                 if (score === 12) {
                     const existing12Key = Object.entries(currentVotes).find(([key, s]) => {
                         const [cid, stg] = key.split('_');
@@ -456,25 +453,28 @@
                     if (existing12Key) delete currentVotes[existing12Key[0]];
                 }
 
-                // Toggle logic
                 if (currentVotes[voteKey] === score) {
                     delete currentVotes[voteKey];
                 } else {
                     currentVotes[voteKey] = score;
                 }
 
-                // Write update to Firebase
                 db.ref(`votes/${user.id}`).set(currentVotes);
             };
 
-            const promoteToFinal = (country) => {
-                // Update specific country in Firebase
+            // NEW: Toggle Final status (Duplicate don't move)
+            const toggleFinalStatus = (country, isFinalist) => {
                 const updatedCountries = countries.map(c =>
-                    c.id === country.id ? { ...c, stage: 'Финал' } : c
+                    c.id === country.id ? { ...c, isFinalist: isFinalist } : c
                 );
+                db.ref('countries').set(updatedCountries);
+            };
 
-                if (!countries.find(c => c.id === country.id && c.stage === 'Финал')) {
-                    db.ref('countries').set(updatedCountries);
+            // NEW: GLOBAL RESET
+            const globalReset = () => {
+                if (confirm('ВНИМАНИЕ! Это удалит ВСЕ голоса и вернет страны в исходное положение. Вы уверены?')) {
+                    db.ref('votes').remove();
+                    db.ref('countries').set(INITIAL_COUNTRIES);
                 }
             };
 
@@ -496,13 +496,25 @@
                 });
 
                 return countries
-                    .filter(c => c.stage === stageName)
+                    .filter(c => {
+                        if (stageName === 'Финал') {
+                            return c.stage === 'Финал' || c.isFinalist === true;
+                        }
+                        return c.stage === stageName;
+                    })
                     .map(c => ({ ...c, total: scores[c.id] || 0 }))
                     .sort((a, b) => b.total - a.total);
             };
 
-            // Current User's votes for Voting View
             const myVotes = user && allVotes[user.id] ? allVotes[user.id] : {};
+
+            // Filter countries for display based on stage
+            const visibleCountries = countries.filter(c => {
+                if (currentStage === 'Финал') {
+                    return c.stage === 'Финал' || c.isFinalist === true;
+                }
+                return c.stage === currentStage;
+            });
 
             if (!user) {
                 return (
@@ -572,7 +584,14 @@
                                     ))}
                                 </div>
                             </div>
-                            <div className="flex justify-end flex-shrink-0">
+                            <div className="flex justify-end flex-shrink-0 items-center gap-2">
+                                {isAdmin && (
+                                    <button onClick={globalReset} className="p-2 text-white/20 hover:text-red-500 transition-colors" title="Сброс системы">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                        </svg>
+                                    </button>
+                                )}
                                 <button onClick={logout} className="p-2 text-white/20 hover:text-red-400 transition-colors">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                                 </button>
@@ -587,7 +606,7 @@
                                     <SlidingTabs options={STAGES} activeValue={currentStage} onChange={setCurrentStage} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                    {countries.filter(c => c.stage === currentStage).map((country, idx) => {
+                                    {visibleCountries.map((country, idx) => {
                                         const voteKey = `${country.id}_${currentStage}`;
                                         const currentScore = myVotes[voteKey];
                                         return (
@@ -614,8 +633,18 @@
                                                                 <button key={score} onClick={() => castVote(country.id, score, currentStage)} className={`py-3.5 rounded-xl font-black text-xs border transition-all ${currentScore === score ? 'bg-white text-black border-white shadow-xl scale-105' : score === 12 ? 'bg-yellow-400/20 text-yellow-400 border-yellow-400/40 active:bg-yellow-400 active:text-black' : 'bg-black/40 border-white/10 active:bg-indigo-500/20 backdrop-blur-md'}`}>{score}</button>
                                                             ))}
                                                         </div>
-                                                        {isAdmin && currentStage !== 'Финал' && (
-                                                            <button onClick={() => promoteToFinal(country)} className="w-full bg-blue-500/30 hover:bg-blue-500/50 text-[10px] font-black py-2.5 rounded-xl text-blue-200 transition-colors border border-blue-500/40 uppercase tracking-widest">Финал+</button>
+                                                        {isAdmin && (
+                                                            <>
+                                                                {currentStage !== 'Финал' && !country.isFinalist && (
+                                                                    <button onClick={() => toggleFinalStatus(country, true)} className="w-full bg-blue-500/30 hover:bg-blue-500/50 text-[10px] font-black py-2.5 rounded-xl text-blue-200 transition-colors border border-blue-500/40 uppercase tracking-widest">В Финал</button>
+                                                                )}
+                                                                {currentStage !== 'Финал' && country.isFinalist && (
+                                                                    <div className="w-full text-center text-green-400 text-[10px] font-black uppercase tracking-widest py-2.5 bg-green-500/10 rounded-xl border border-green-500/20">В Финале ✓</div>
+                                                                )}
+                                                                {currentStage === 'Финал' && country.stage !== 'Финал' && (
+                                                                    <button onClick={() => toggleFinalStatus(country, false)} className="w-full bg-red-500/20 hover:bg-red-500/40 text-[10px] font-black py-2.5 rounded-xl text-red-300 transition-colors border border-red-500/30 uppercase tracking-widest">Убрать из финала</button>
+                                                                )}
+                                                            </>
                                                         )}
                                                     </div>
                                                 </div>
